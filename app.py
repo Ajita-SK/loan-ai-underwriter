@@ -8,11 +8,31 @@ from pathlib import Path
 from typing import Iterable
 
 from pypdf import PdfReader
+import requests
 
 OUTPUT_FILENAME = "loan_documents.txt"
+OCR_API_KEY = "K81340368688957"
 
 
 def find_pdf_files(folder: Path) -> list[Path]:
+    def run_ocr_space(pdf_path: Path) -> str:
+
+    url = "https://api.ocr.space/parse/image"
+
+    with open(pdf_path, "rb") as f:
+
+        payload = {
+            "apikey": OCR_API_KEY,
+            "language": "eng"
+        }
+
+        files = {"file": f}
+
+        response = requests.post(url, data=payload, files=files)
+
+    result = response.json()
+
+    return result["ParsedResults"][0]["ParsedText"]
     """Return all PDF files inside folder (non-recursive), sorted by name."""
     return sorted(
         [path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
@@ -20,6 +40,22 @@ def find_pdf_files(folder: Path) -> list[Path]:
 
 
 def extract_text_from_pdf(pdf_path: Path) -> str:
+     """Extract text from one PDF file."""
+
+    reader = PdfReader(str(pdf_path))
+    pages: Iterable[str] = (page.extract_text() or "" for page in reader.pages)
+
+    text = "\n".join(pages).strip()
+
+    # If text is very small → assume scanned PDF
+    if len(text) < 100:
+    try:
+        print(f"OCR processing for scanned PDF: {pdf_path.name}")
+        text = run_ocr_space(pdf_path)
+    except Exception as e:
+        print(f"OCR failed for {pdf_path.name}: {e}")
+
+    return text
     """Extract text from one PDF file."""
     reader = PdfReader(str(pdf_path))
     pages: Iterable[str] = (page.extract_text() or "" for page in reader.pages)
