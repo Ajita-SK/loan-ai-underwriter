@@ -1,20 +1,30 @@
 <!DOCTYPE html>
 <html>
-
 <head>
-<title>Loan AI Underwriter</title>
+    <title>Loan AI Underwriter</title>
 </head>
 
 <body>
 
 <h2>Upload Loan PDFs</h2>
 
-<form action="/upload" method="post" enctype="multipart/form-data">
-<input type="file" name="files" multiple>
-<br><br>
-<button type="submit">Analyze Loan Package</button>
+<form method="POST" enctype="multipart/form-data">
+    
+    <input type="file" name="pdfs" multiple>
+    
+    <br><br>
+    
+    <button type="submit">Analyze Loan</button>
+
 </form>
 
-</body>
+<hr>
 
+<h2>Analysis Result</h2>
+
+<pre>
+{{ result }}
+</pre>
+
+</body>
 </html>
