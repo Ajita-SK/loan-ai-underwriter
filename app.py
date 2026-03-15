@@ -15,12 +15,11 @@ OCR_API_KEY = "K81340368688957"
 
 
 def run_ocr_space(pdf_path: Path) -> str:
-    """Run OCR using OCR.space API for scanned PDFs."""
+    """Run OCR using OCR.space for scanned PDFs."""
 
     url = "https://api.ocr.space/parse/image"
 
     with open(pdf_path, "rb") as f:
-
         payload = {
             "apikey": OCR_API_KEY,
             "language": "eng"
@@ -37,8 +36,10 @@ def run_ocr_space(pdf_path: Path) -> str:
 
 def find_pdf_files(folder: Path) -> list[Path]:
     """Return all PDF files inside folder (non-recursive), sorted by name."""
+
     return sorted(
-        [path for path in folder.iterdir() if path.is_file() and path.suffix.lower() == ".pdf"]
+        [path for path in folder.iterdir()
+         if path.is_file() and path.suffix.lower() == ".pdf"]
     )
 
 
@@ -50,7 +51,7 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
 
     text = "\n".join(pages).strip()
 
-    # If text is very small → assume scanned PDF
+    # If little text → assume scanned PDF
     if len(text) < 100:
         try:
             print(f"OCR processing for scanned PDF: {pdf_path.name}")
@@ -62,7 +63,7 @@ def extract_text_from_pdf(pdf_path: Path) -> str:
 
 
 def combine_pdf_texts(input_folder: Path, output_file: Path) -> int:
-    """Extract text from all PDFs and write into one text file."""
+    """Extract text from all PDFs and combine into one text file."""
 
     pdf_files = find_pdf_files(input_folder)
 
@@ -113,7 +114,9 @@ def main() -> None:
     input_folder: Path = args.input_folder.expanduser().resolve()
 
     if not input_folder.exists() or not input_folder.is_dir():
-        raise SystemExit(f"Input folder does not exist or is not a directory: {input_folder}")
+        raise SystemExit(
+            f"Input folder does not exist or is not a directory: {input_folder}"
+        )
 
     output_file = input_folder / OUTPUT_FILENAME
 
