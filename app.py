@@ -1,22 +1,19 @@
-#!/usr/bin/env python3
-"""Loan AI Underwriter: extract text from PDF loan documents."""
-
-from __future__ import annotations
-
-import argparse
+from flask import Flask, render_template, request, send_file
 from pathlib import Path
-from typing import Iterable
-
 from pypdf import PdfReader
 import requests
+import os
 
+app = Flask(__name__)
+
+UPLOAD_FOLDER = "uploads"
 OUTPUT_FILENAME = "loan_documents.txt"
 OCR_API_KEY = "K81340368688957"
 
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-def run_ocr_space(pdf_path: Path) -> str:
-    """Run OCR using OCR.space for scanned PDFs."""
 
+def run_ocr_space(pdf_path):
     url = "https://api.ocr.space/parse/image"
 
     with open(pdf_path, "rb") as f:
@@ -34,97 +31,54 @@ def run_ocr_space(pdf_path: Path) -> str:
     return result["ParsedResults"][0]["ParsedText"]
 
 
-def find_pdf_files(folder: Path) -> list[Path]:
-    """Return all PDF files inside folder (non-recursive), sorted by name."""
-
-    return sorted(
-        [path for path in folder.iterdir()
-         if path.is_file() and path.suffix.lower() == ".pdf"]
-    )
-
-
-def extract_text_from_pdf(pdf_path: Path) -> str:
-    """Extract text from one PDF file."""
+def extract_text_from_pdf(pdf_path):
 
     reader = PdfReader(str(pdf_path))
-    pages: Iterable[str] = (page.extract_text() or "" for page in reader.pages)
+    text = ""
 
-    text = "\n".join(pages).strip()
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            text += page_text
 
-    # If little text → assume scanned PDF
-    if len(text) < 100:
+    if len(text.strip()) < 100:
         try:
-            print(f"OCR processing for scanned PDF: {pdf_path.name}")
             text = run_ocr_space(pdf_path)
         except Exception as e:
-            print(f"OCR failed for {pdf_path.name}: {e}")
+            print("OCR failed:", e)
 
     return text
 
 
-def combine_pdf_texts(input_folder: Path, output_file: Path) -> int:
-    """Extract text from all PDFs and combine into one text file."""
-
-    pdf_files = find_pdf_files(input_folder)
-
-    if not pdf_files:
-        raise ValueError(f"No PDF files found in folder: {input_folder}")
-
-    sections: list[str] = []
-
-    for pdf_file in pdf_files:
-        extracted_text = extract_text_from_pdf(pdf_file)
-
-        section = (
-            f"{'=' * 80}\n"
-            f"SOURCE FILE: {pdf_file.name}\n"
-            f"{'=' * 80}\n"
-            f"{extracted_text}\n"
-        )
-
-        sections.append(section)
-
-    output_file.write_text("\n\n".join(sections), encoding="utf-8")
-
-    return len(pdf_files)
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        prog="Loan AI Underwriter",
-        description=(
-            "Extract text from every PDF in a folder and combine all text into "
-            f"a single {OUTPUT_FILENAME} file."
-        ),
-    )
+@app.route("/upload", methods=["POST"])
+def upload():
 
-    parser.add_argument(
-        "input_folder",
-        type=Path,
-        help="Path to a folder containing PDF loan documents.",
-    )
+    files = request.files.getlist("files")
 
-    return parser.parse_args()
+    combined_text = ""
 
+    for file in files:
 
-def main() -> None:
+        filepath = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(filepath)
 
-    args = parse_args()
+        text = extract_text_from_pdf(filepath)
 
-    input_folder: Path = args.input_folder.expanduser().resolve()
+        combined_text += f"\n\n===== {file.filename} =====\n\n"
+        combined_text += text
 
-    if not input_folder.exists() or not input_folder.is_dir():
-        raise SystemExit(
-            f"Input folder does not exist or is not a directory: {input_folder}"
-        )
+    output_path = os.path.join(UPLOAD_FOLDER, OUTPUT_FILENAME)
 
-    output_file = input_folder / OUTPUT_FILENAME
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(combined_text)
 
-    processed_count = combine_pdf_texts(input_folder, output_file)
-
-    print(f"Processed {processed_count} PDF file(s).")
-    print(f"Combined text written to: {output_file}")
+    return send_file(output_path, as_attachment=True)
 
 
 if __name__ == "__main__":
-    main()
+    app.run(debug=True)
